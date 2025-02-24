@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Databyte image chatapp</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    .message-transition {
+      transition: opacity 0.3s ease-in, transform 0.3s ease-in;
+    }
+    .font-mono {
+      font-family: 'Roboto Mono', monospace;
+    }
+    /* Sidebar styling */
+    #sidebar {
+      transition: transform 0.3s ease-in-out;
+    }
+    #sidebar.hidden-sidebar {
+      transform: translateX(-100%);
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-white font-mono min-h-screen">
+  <!-- Main layout with sidebar and chat container -->
+  <div class="flex h-screen">
+    <!-- Sidebar Gallery -->
+    <div id="sidebar" class="w-64 bg-slate-800 p-4 overflow-y-auto hidden-sidebar">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold">Gallery</h2>
+        <button onclick="toggleSidebar()" class="text-2xl hover:text-cyan-400">close ×</button>
+      </div>
+      <div id="sidebar-images" class="space-y-4">
+        <!-- Gallery images will be appended here -->
+      </div>
+    </div>
+
+    <!-- Chat Container -->
+    <div class="flex-1 flex flex-col">
+      <!-- Chat Header -->
+      <div class="bg-slate-800 p-4 rounded-t-lg shadow-lg flex items-center">
+        <div>
+          <h1 class="text-2xl font-bold text-cyan-400">Databyte image chatapp</h1>
+          <p class="text-slate-400">Send text/images and get smart responses</p>
+        </div>
+        <button onclick="toggleSidebar()" class="ml-auto px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded transition-colors">
+          📂 Gallery
+        </button>
+      </div>
+
+      <!-- Chat Messages Container -->
+      <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-800/50 scroll-smooth">
+        <!-- Initial Bot Message -->
+        <div class="bot-message flex justify-start">
+          <div class="max-w-[80%] bg-slate-700 p-4 rounded-lg shadow-md message-transition">
+            <p>Hello! I'm your vision assistant. You can send me text, images, or even speak your prompt!</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input Area -->
+      <div class="bg-slate-800 p-4 rounded-b-lg shadow-lg">
+        <div id="preview-container" class="mb-2"></div>
+        <div class="flex gap-2">
+          <input type="file" id="image-input" accept="image/*" class="hidden" multiple />
+          <button onclick="document.getElementById('image-input').click()"
+                  class="px-4 py-2 bg-cyan-600 border border-blue-500 hover:bg-cyan-700 rounded-lg transition-colors">
+            📷 Add Image
+          </button>
+          <!-- Voice input button -->
+          <button onclick="startVoiceInput()"
+                  class="px-4 py-2 bg-green-600 border border-green-300 hover:bg-green-700 rounded-lg transition-colors">
+            🎤 Speak
+          </button>
+          <div class="flex-1 relative">
+            <textarea id="user-input"
+                      class="w-full bg-slate-700 p-3 rounded-lg pr-16 resize-none my-1"
+                      placeholder="Type your message..."
+                      rows="1"></textarea>
+            <button onclick="handleSend()"
+                    class="absolute right-1 border border-blue-500 text-xm bottom-2 p-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors my-[7px]">
+              🚀 Send
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image Preview Modal -->
+  <div id="image-modal" class="fixed inset-0 bg-black/80 hidden items-center justify-center">
+    <div class="bg-slate-800 p-4 rounded-lg max-w-4xl max-h-[90vh] relative">
+      <img id="modal-image" class="max-w-full max-h-[80vh] rounded-lg" />
+      <button onclick="closeModal()"
+              class="absolute top-4 right-4 text-2xl bg-slate-700 rounded-full w-8 h-8 flex items-center justify-center hover:bg-slate-600">
+        ×
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Global arrays to keep track of images for the gallery
+    let attachedImages = [];
+    // We'll use a Set for user images to avoid duplicates.
+    const gallerySet = new Set();
+
+    // Handle image input changes
+    document.getElementById('image-input').addEventListener('change', function(e) {
+      const files = Array.from(e.target.files);
+      attachedImages = [...attachedImages, ...files];
+      updatePreview();
+    });
+
+ 
+    function updatePreview() {
+      const container = document.getElementById('preview-container');
+      container.innerHTML = attachedImages.map((file, index) => {
+        const fileURL = URL.createObjectURL(file);
+        return `
+          <div class="relative inline-block m-1">
+            <img src="${fileURL}"
+                 class="w-24 h-24 object-cover rounded-lg cursor-pointer"
+                 onclick="showModal('${fileURL}')">
+            <button onclick="removeImage(${index})"
+                    class="absolute -top-2 -right-2 bg-red-500 rounded-full w-5 h-5 flex items-center justify-center text-xs">
+              ×
+            </button>
+            <a href="${fileURL}" download class="block text-xs text-cyan-400 mt-1 text-center">Download</a>
+          </div>
+        `;
+      }).join('');
+    }
+
+   
+  async function handleSend() {
+  const userInput = document.getElementById('user-input').value.trim();
+  const images = attachedImages;
+
+  if (!userInput && images.length === 0) {
+    alert('Please enter a message or attach images');
+    return;
+  }
+
+  appendMessage({
+    type: 'user',
+    text: userInput,
+    images: images
+  });
+
+  document.getElementById('user-input').value = '';
+  attachedImages = [];
+  document.getElementById('preview-container').innerHTML = '';
+  document.getElementById('image-input').value = ''; // Reset file input
+  document.getElementById('user-input').focus(); // Refocus text area
+
+  const loadingMessage = appendMessage({
+    type: 'bot',
+    loading: true
+  });
+
+  try {
+    const response = await simulateApiCall({
+      text: userInput,
+      images: images
+    });
+
+    loadingMessage.remove();
+
+    appendMessage({
+      type: 'bot',
+      text: response.text,
+      image: response.image
+    });
+  } catch (error) {
+    loadingMessage.remove();
+    appendMessage({
+      type: 'bot',
+      text: 'Error: Could not get response from the server'
+    });
+  }
+}
+
+
+    // Append message to chat
+    function appendMessage({ type, text, images, image, loading }) {
+      const messagesContainer = document.getElementById('messages');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `${type}-message flex justify-${type === 'user' ? 'end' : 'start'}`;
+
+      // Build content for user images (if any)
+      let imagesHtml = '';
+      if (images) {
+        imagesHtml = images.map(file => {
+          const fileURL = URL.createObjectURL(file);
+          // Add to sidebar (for user images, check duplicates)
+          addImageToSidebar(fileURL);
+          return `
+            <div class="mt-2 inline-block">
+              <img src="${fileURL}" class="w-24 h-24 object-cover rounded-lg cursor-pointer"
+                   onclick="showModal('${fileURL}')">
+              <a href="${fileURL}" download class="block text-xs text-cyan-400 mt-1 text-center">Download</a>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Build content for bot image (if any)
+      let botImageHtml = '';
+      if (image) {
+        // For bot images, always add to the sidebar (even if URL is the same)
+        addImageToSidebar(image, true);
+        botImageHtml = `
+          <div class="mt-4 border-t border-slate-500 pt-2">
+            <div class="inline-block">
+              <img src="${image}" class="max-w-full rounded-lg cursor-pointer" onclick="showModal('${image}')">
+              <a href="${image}" download class="block text-xs text-cyan-400 mt-1 text-center">Download</a>
+            </div>
+          </div>
+        `;
+      }
+
+      
+      let speakerButton = '';
+      if (type === 'bot' && text && !loading) {
+        
+        speakerButton = `<button onclick="speakText(\`${text.replace(/`/g, '\\`')}\`)"
+                              class="ml-2 inline-block px-2 py-1 bg-slate-600 hover:bg-slate-500 rounded">
+                            🔊
+                          </button>`;
+      }
+
+      messageDiv.innerHTML = `
+        <div class="max-w-[80%] bg-${type === 'user' ? 'cyan-700' : 'slate-700'} p-4 rounded-lg shadow-md message-transition opacity-0 transform translate-y-2">
+          ${loading ? `
+            <div class="flex items-center gap-2">
+              <div class="animate-spin">🌀</div>
+              Analyzing...
+            </div>
+          ` : ''}
+          ${text ? `<p class="${loading ? 'hidden' : ''} inline-block whitespace-pre-line">${text}</p>` : ''}
+          ${speakerButton}
+          ${imagesHtml}
+          ${botImageHtml}
+        </div>
+      `;
+
+      messagesContainer.appendChild(messageDiv);
+      messageDiv.scrollIntoView({ behavior: 'smooth' });
+
+     
+      setTimeout(() => {
+        messageDiv.querySelector('.message-transition').classList.remove('opacity-0', 'translate-y-2');
+      }, 50);
+
+      return messageDiv;
+    }
+
+    // Simulated API call (Replace with actual fetch)
+    async function simulateApiCall(data) {
+    const formData = new FormData();
+    formData.append('prompt', data.text);
+    data.images.forEach((img, i) => formData.append('images', img));
+
+    const response = await fetch('http://localhost:8000/api/chat', {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to fetch response from the server');
+    }
+
+    return await response.json();
+}
+
+    // Image modal functions
+    function showModal(src) {
+      document.getElementById('image-modal').classList.remove('hidden');
+      document.getElementById('modal-image').src = src;
+    }
+
+    function closeModal() {
+      document.getElementById('image-modal').classList.add('hidden');
+    }
+
+    function removeImage(index) {
+      attachedImages.splice(index, 1);
+      updatePreview();
+    }
+
+    // Voice input functionality using Web Speech API
+    function startVoiceInput() {
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert('Your browser does not support speech recognition.');
+        return;
+      }
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      recognition.onresult = function(event) {
+        document.getElementById('user-input').value = event.results[0][0].transcript;
+      };
+      recognition.onerror = function(event) {
+        console.error('Speech recognition error', event.error);
+      };
+      recognition.start();
+    }
+
+    // Text-to-speech functionality for bot responses (softer voice)
+    function speakText(text) {
+      if (!('speechSynthesis' in window)) {
+        alert('Your browser does not support text-to-speech.');
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(text);
+      // Adjust rate, pitch, and volume for a softer voice
+      utterance.rate = 0.9;
+      utterance.pitch = 0.9;
+      utterance.volume = 0.8;
+      // Optionally, you can select a specific voice if available:
+      const voices = speechSynthesis.getVoices();
+      // Example: try to pick a female English voice if available
+      const selectedVoice = voices.find(v => v.lang.includes('en-US') && v.name.toLowerCase().includes('female'));
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+      speechSynthesis.speak(utterance);
+    }
+
+    // Auto-resize textarea
+    document.getElementById('user-input').addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = this.scrollHeight + 'px';
+    });
+
+    // Handle Enter key (without Shift)
+    document.getElementById('user-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    });
+
+    // Sidebar toggle functionality
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar.classList.contains('hidden-sidebar')) {
+        sidebar.classList.remove('hidden-sidebar');
+        sidebar.classList.remove('hidden');
+      } else {
+        sidebar.classList.add('hidden-sidebar');
+      }
+    }
+
+    // Add an image to the sidebar gallery.
+    // If skipDuplicateCheck is true (for bot images), then add regardless.
+    function addImageToSidebar(src, skipDuplicateCheck = false) {
+      if (!skipDuplicateCheck && gallerySet.has(src)) return;
+      if (!skipDuplicateCheck) {
+        gallerySet.add(src);
+      }
+      const sidebarImages = document.getElementById('sidebar-images');
+      const imgWrapper = document.createElement('div');
+      imgWrapper.className = "relative";
+      imgWrapper.innerHTML = `
+        <img src="${src}" class="w-full h-auto rounded cursor-pointer" onclick="showModal('${src}')">
+        <a href="${src}" download class="block text-xs text-cyan-400 mt-1 text-center">Download</a>
+      `;
+      sidebarImages.appendChild(imgWrapper);
+    }
+  </script>
+</body>
+</html>
