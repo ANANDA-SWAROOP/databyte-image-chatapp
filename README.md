@@ -22,8 +22,8 @@ Ensure you have the following installed:
 
 ### Clone the Repository
 ```sh
- git clone <repository-url>
- cd <repository-folder>
+ git clone https://github.com/ANANDA-SWAROOP/databyte-image-chatapp.git
+ cd <databyte-image-chatapp>
 ```
 
 ### Install Dependencies
@@ -36,7 +36,7 @@ pip install -r requirements.txt
 ### Running the API
 To start the FastAPI server, run:
 ```sh
-uvicorn anand:app --host 0.0.0.0 --port 8000
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 The API will be accessible at `http://localhost:8000`.
@@ -88,7 +88,7 @@ FROM python:3.9
 WORKDIR /app
 COPY . /app
 RUN pip install -r requirements.txt
-CMD ["uvicorn", "anand:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 2. Build and run the container:
 ```sh
@@ -100,5 +100,5 @@ docker run -p 8000:8000 vision-chatbot
 This project is licensed under the MIT License.
 
 ## Author
-Anand
+Ananda swaroop 
 
